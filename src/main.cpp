@@ -38,8 +38,10 @@ int main()
 {
   uWS::Hub h;
 
-  // Initialize the pid object
-  PID pid(0.1, 0.01, 0.001);
+  // Instantiate the pid objects
+  PID steer_pid(0.1, 0.01, 0.001);
+  PID speed_pid(0.1, 0.05, 0.0);
+
   Utils utils;
 
   double previous_time;
@@ -48,7 +50,7 @@ int main()
 	FILE * file;
   file = fopen ("simout.txt", "w");
 
-  h.onMessage([&pid, &utils, &file, &previous_time](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
+  h.onMessage([&steer_pid, &speed_pid, &utils, &file, &previous_time](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
@@ -63,42 +65,72 @@ int main()
           double cte = std::stod(j[1]["cte"].get<std::string>());
           double speed = std::stod(j[1]["speed"].get<std::string>());
           double angle = std::stod(j[1]["steering_angle"].get<std::string>());
-          double steer_value;
-        
-          if (!pid.is_initialized) {
+          double steer_value, throttle_value;
+          double current_time = clock();
+          double dt = (current_time - previous_time) / CLOCKS_PER_SEC;
+          previous_time = current_time;
+          double speed_target = 20.0;
+          double speed_error = speed_target - speed;
+
+          if (!steer_pid.is_initialized) {
             
-            pid.Init(cte);
-            steer_value = -cte * pid.Kp;
+            steer_pid.Init(cte);
+            steer_value = -cte * steer_pid.Kp;
             previous_time = clock();
 
           }
           else {
 
-            double current_time = clock();
-            double dt = (current_time - previous_time) / CLOCKS_PER_SEC;
-            previous_time = current_time;
-            pid.UpdateError(cte, dt);
-            steer_value = -pid.ControlActuation();            
+            steer_pid.UpdateError(cte, dt);
+            steer_value = -steer_pid.ControlActuation();            
 
           }        
 
+          if (!speed_pid.is_initialized) {
+
+            speed_pid.Init(speed_error);
+            throttle_value = speed_pid.Kp;
+            
+          }
+          else {
+
+            speed_pid.UpdateError(speed_error, dt);
+            throttle_value = speed_pid.ControlActuation();
+
+          }
+
           // steer_value = utils.SmoothSaturation(steer_value_unbounded, 1.0, 0.1);
           if (steer_value > 1.0) {
+
             steer_value = 1.0;
+
           }
           else if (steer_value < -1.0) {
+
             steer_value = -1.0;
+
+          }
+
+          if (throttle_value > 1.0) {
+
+            throttle_value = 1.0;
+            
+          }
+          else if (throttle_value < -1.0) {
+
+            throttle_value = -1.0;
+
           }
           
           // DEBUG
-          std::cout << "CTE: " << cte << " Steering Value: " << steer_value << std::endl;
+          std::cout << "CTE: " << cte << " Steering Value: " << steer_value << " Speed: " << speed << std::endl;
 
           fprintf(file, "%10.6f, %10.6f, %10.6f, %10.6f, %10.6f, %10.6f, %10.6f\n",
-                  speed, angle, cte, steer_value, pid.p_error, pid.i_error, pid.d_error);
+                  speed, angle, cte, steer_value, steer_pid.p_error, steer_pid.i_error, steer_pid.d_error);
 
           json msgJson;
           msgJson["steering_angle"] = steer_value;
-          msgJson["throttle"] = 0.3;
+          msgJson["throttle"] = throttle_value;
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
           std::cout << msg << std::endl;
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
