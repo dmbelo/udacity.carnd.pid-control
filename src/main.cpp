@@ -5,6 +5,11 @@
 #include "PID.h"
 #include "utils.h"
 
+// TODO Implement speed control
+// TODO Implement twiddle at constant speed
+// TODO Implement speed dependent steering gains
+// TODO Implement filter on steer/throttle control
+
 // for convenience
 using json = nlohmann::json;
 
