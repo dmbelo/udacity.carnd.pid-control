@@ -5,6 +5,8 @@ class PID {
 
 public:
 
+  bool is_initialized;
+
   // Errors
   double p_error;
   double i_error;
@@ -16,13 +18,13 @@ public:
   double Kd;
 
   // Constructor
-  PID();
+  PID(double Kp_, double Ki_, double Kd_);
 
   // Destructor
   virtual ~PID();
 
   // Initialize PID
-  void Init(double Kp, double Ki, double Kd);
+  void Init(double cte);
 
   // Update the PID error variables given cross track error.
   void UpdateError(double cte, double dt);

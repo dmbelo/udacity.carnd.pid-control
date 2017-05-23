@@ -1,9 +1,8 @@
 #include <uWS/uWS.h>
 #include <iostream>
 #include "json.hpp"
-#include "PID.h"
 #include <math.h>
-
+#include "PID.h"
 #include "utils.h"
 
 // for convenience
@@ -35,11 +34,16 @@ int main()
   uWS::Hub h;
 
   // Initialize the pid object
-  PID pid;
+  PID pid(0.1, 0.01, 0.001);
   Utils utils;
-  pid.Init(0.025, 0.0005, 0.0);
 
-  h.onMessage([&pid, &utils](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
+  double previous_time;
+
+  // Open a file to save some results
+	FILE * file;
+  file = fopen ("simout.txt", "w");
+
+  h.onMessage([&pid, &utils, &file, &previous_time](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
@@ -55,18 +59,37 @@ int main()
           double speed = std::stod(j[1]["speed"].get<std::string>());
           double angle = std::stod(j[1]["steering_angle"].get<std::string>());
           double steer_value;
-          /*
-          * TODO: Calcuate steering value here, remember the steering value is
-          * [-1, 1].
-          * NOTE: Feel free to play around with the throttle and speed. Maybe use
-          * another PID controller to control the speed!
-          */
-          pid.UpdateError(cte, 1.0);
-          double steer_value_unbounded = -pid.ControlActuation();
-          steer_value = utils.SmoothSaturation(steer_value_unbounded, 1.0, 0.1);
+        
+          if (!pid.is_initialized) {
+            
+            pid.Init(cte);
+            steer_value = -cte * pid.Kp;
+            previous_time = clock();
+
+          }
+          else {
+
+            double current_time = clock();
+            double dt = (current_time - previous_time) / CLOCKS_PER_SEC;
+            previous_time = current_time;
+            pid.UpdateError(cte, dt);
+            steer_value = -pid.ControlActuation();            
+
+          }        
+
+          // steer_value = utils.SmoothSaturation(steer_value_unbounded, 1.0, 0.1);
+          if (steer_value > 1.0) {
+            steer_value = 1.0;
+          }
+          else if (steer_value < -1.0) {
+            steer_value = -1.0;
+          }
           
           // DEBUG
           std::cout << "CTE: " << cte << " Steering Value: " << steer_value << std::endl;
+
+          fprintf(file, "%10.6f, %10.6f, %10.6f, %10.6f, %10.6f, %10.6f, %10.6f\n",
+                  speed, angle, cte, steer_value, pid.p_error, pid.i_error, pid.d_error);
 
           json msgJson;
           msgJson["steering_angle"] = steer_value;
@@ -102,9 +125,10 @@ int main()
     std::cout << "Connected!!!" << std::endl;
   });
 
-  h.onDisconnection([&h](uWS::WebSocket<uWS::SERVER> ws, int code, char *message, size_t length) {
+  h.onDisconnection([&h, &file](uWS::WebSocket<uWS::SERVER> ws, int code, char *message, size_t length) {
     ws.close();
     std::cout << "Disconnected" << std::endl;
+    fclose (file);
   });
 
   int port = 4567;
