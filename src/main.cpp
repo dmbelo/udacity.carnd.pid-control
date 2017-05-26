@@ -5,7 +5,6 @@
 #include "PID.h"
 #include "utils.h"
 
-// TODO Implement speed control
 // TODO Implement twiddle at constant speed
 // TODO Implement speed dependent steering gains
 // TODO Implement filter on steer/throttle control
@@ -39,7 +38,7 @@ int main()
   uWS::Hub h;
 
   // Instantiate the pid objects
-  PID steer_pid(0.1, 0.01, 0.001);
+  PID steer_pid(1, 0.00, 0.05);
   PID speed_pid(0.1, 0.05, 0.0);
 
   Utils utils;
@@ -47,8 +46,7 @@ int main()
   double previous_time;
 
   // Open a file to save some results
-	FILE * file;
-  file = fopen ("simout.txt", "w");
+	FILE * file;  
 
   h.onMessage([&steer_pid, &speed_pid, &utils, &file, &previous_time](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
@@ -158,8 +156,9 @@ int main()
     }
   });
 
-  h.onConnection([&h](uWS::WebSocket<uWS::SERVER> ws, uWS::HttpRequest req) {
+  h.onConnection([&h, &file](uWS::WebSocket<uWS::SERVER> ws, uWS::HttpRequest req) {
     std::cout << "Connected!!!" << std::endl;
+    file = fopen ("simout.txt", "w");
   });
 
   h.onDisconnection([&h, &file](uWS::WebSocket<uWS::SERVER> ws, int code, char *message, size_t length) {
