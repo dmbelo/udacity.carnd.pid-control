@@ -6,9 +6,9 @@
 #include "utils.h"
 #include "filter.h"
 
+// Check for time step?
 // TODO Implement twiddle at constant speed
 // TODO Implement speed dependent steering gains
-// TODO Implement filter on steer/throttle control
 
 // for convenience
 using json = nlohmann::json;
