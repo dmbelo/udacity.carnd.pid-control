@@ -9,6 +9,10 @@ PID::PID(double Kp_, double Ki_, double Kd_) {
     Ki = Ki_;
     Kd = Kd_;
 
+    u_p = 0;
+    u_i = 0;
+    u_d = 0;
+
     is_initialized = false;
 
 }
@@ -35,7 +39,11 @@ void PID::UpdateError(double cte, double dt) {
 
 double PID::ControlActuation() {
 
-    double u = p_error * Kp + i_error * Ki + d_error * Kd;
+    u_p = p_error * Kp;
+    u_i = i_error * Ki;
+    u_d = d_error * Kd;
+
+    double u = u_p + u_i + u_d;
     
     return u;
 

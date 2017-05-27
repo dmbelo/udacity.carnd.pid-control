@@ -12,6 +12,11 @@ public:
   double i_error;
   double d_error;
 
+  // Inidividual contorl components
+  double u_p;
+  double u_i;
+  double u_d;
+
   // Coefficients 
   double Kp;
   double Ki;

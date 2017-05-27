@@ -4,6 +4,7 @@
 #include <math.h>
 #include "PID.h"
 #include "utils.h"
+#include "filter.h"
 
 // TODO Implement twiddle at constant speed
 // TODO Implement speed dependent steering gains
@@ -38,8 +39,17 @@ int main()
   uWS::Hub h;
 
   // Instantiate the pid objects
-  PID steer_pid(1, 0.00, 0.05);
-  PID speed_pid(0.1, 0.05, 0.0);
+  // PID steer_pid(0.1, 0.03, 0.005); // 20 MPH
+  PID steer_pid(0.1*0.85, 0.03*0.65*0, 0.005*0.65); // 50 MPH
+  PID speed_pid(0.1, 0.05, 0.00);
+
+  // Instantiate filter object
+  Filter throttle_filter(0.3);
+  Filter steer_filter(1);
+  Filter cte_filter(1);
+  throttle_filter.Init(0.0);
+  steer_filter.Init(0.0);
+  cte_filter.Init(0.0);
 
   Utils utils;
 
@@ -48,7 +58,7 @@ int main()
   // Open a file to save some results
 	FILE * file;  
 
-  h.onMessage([&steer_pid, &speed_pid, &utils, &file, &previous_time](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
+  h.onMessage([&steer_pid, &speed_pid, &utils, &file, &previous_time, &cte_filter, &steer_filter, &throttle_filter](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
@@ -67,19 +77,21 @@ int main()
           double current_time = clock();
           double dt = (current_time - previous_time) / CLOCKS_PER_SEC;
           previous_time = current_time;
-          double speed_target = 20.0;
+          double speed_target = 50.0;
           double speed_error = speed_target - speed;
+
+          double cte_filt = cte_filter.LowPass(cte);
 
           if (!steer_pid.is_initialized) {
             
-            steer_pid.Init(cte);
-            steer_value = -cte * steer_pid.Kp;
+            steer_pid.Init(cte_filt);
+            steer_value = -cte_filt * steer_pid.Kp;
             previous_time = clock();
 
           }
           else {
 
-            steer_pid.UpdateError(cte, dt);
+            steer_pid.UpdateError(cte_filt, dt);
             steer_value = -steer_pid.ControlActuation();            
 
           }        
@@ -120,11 +132,18 @@ int main()
 
           }
           
+          double steer_raw = steer_value;
+
+          steer_value = steer_filter.LowPass(steer_value);
+          throttle_value = throttle_filter.LowPass(throttle_value);
+
           // DEBUG
           std::cout << "CTE: " << cte << " Steering Value: " << steer_value << " Speed: " << speed << std::endl;
 
-          fprintf(file, "%10.6f, %10.6f, %10.6f, %10.6f, %10.6f, %10.6f, %10.6f\n",
-                  speed, angle, cte, steer_value, steer_pid.p_error, steer_pid.i_error, steer_pid.d_error);
+          fprintf(file, "%10.6f, %10.6f, %10.6f, %10.6f, %10.6f, %10.6f, %10.6f, %10.6f, %10.6f, %10.6f, %10.6f, %10.6f\n",
+                  speed, angle, cte, cte_filt, steer_raw, steer_value,
+                  steer_pid.p_error, steer_pid.i_error, steer_pid.d_error, 
+                  steer_pid.u_p, steer_pid.u_i, steer_pid.u_d);
 
           json msgJson;
           msgJson["steering_angle"] = steer_value;
