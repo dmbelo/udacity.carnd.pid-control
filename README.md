@@ -1,7 +1,4 @@
-# CarND-Controls-PID
-Self-Driving Car Engineer Nanodegree Program
-
----
+# udacity.carnd.pid-control
 
 ## Dependencies
 
